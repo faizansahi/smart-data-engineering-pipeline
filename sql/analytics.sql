@@ -1,0 +1,3 @@
+CREATE OR REPLACE VIEW weather_daily_trend AS SELECT observed_on,AVG(temperature_mean) average_temperature,SUM(precipitation_sum) total_precipitation FROM analytics_weather GROUP BY observed_on;
+CREATE OR REPLACE VIEW weather_location_summary AS SELECT location,AVG(temperature_mean) average_temperature,AVG(wind_speed_max) average_max_wind,SUM(precipitation_sum) total_precipitation FROM analytics_weather GROUP BY location;
+CREATE OR REPLACE VIEW weather_anomaly_rate AS SELECT location,100.0*AVG(CASE WHEN is_temperature_anomaly THEN 1 ELSE 0 END) anomaly_rate_percent FROM analytics_weather GROUP BY location;
