@@ -1,0 +1,22 @@
+{
+  "database": "PostgreSQL 16",
+  "input": "explicit synthetic test fixture",
+  "first_run": {
+    "run_id": "916e80f903b74ee902e07a91",
+    "rows": 2,
+    "rejected": 0
+  },
+  "second_run": {
+    "run_id": "916e80f903b74ee902e07a91",
+    "rows": 2,
+    "rejected": 0
+  },
+  "summary": [
+    {
+      "location": "Berlin",
+      "average_temperature": 2.5,
+      "average_max_wind": 15.0,
+      "total_precipitation": 1.0
+    }
+  ]
+}

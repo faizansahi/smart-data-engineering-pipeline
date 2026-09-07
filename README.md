@@ -51,7 +51,7 @@ Python 3.12, Pandas, Requests, Tenacity, SQLAlchemy, PostgreSQL/SQLite, Apache A
 
 The live Open-Meteo demo loaded **7 Berlin observations for 1–7 January 2025**, rejected 0 rows, and kept 7 rows after a second execution. The SQL summary returned 31.0 mm total precipitation. The chart is drawn from those loaded rows. The saved local execution used SQLite; PostgreSQL/container verification is recorded separately.
 
-[Actual output](docs/results/demo.json) · [Test report](docs/results/tests.txt) · [Provenance](docs/results/provenance.md) · [Verification status](docs/results/verification.md)
+[Actual output](docs/results/demo.json) · [PostgreSQL container results](docs/results/docker-demo.json) · [Test report](docs/results/tests.txt) · [Provenance](docs/results/provenance.md) · [Verification status](docs/results/verification.md)
 
 Reproduce using a fresh local database:
 
