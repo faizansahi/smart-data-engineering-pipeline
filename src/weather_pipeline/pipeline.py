@@ -3,9 +3,11 @@ import logging
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 
+import numpy as np
 import pandas as pd
 import requests
 from sqlalchemy import create_engine, text
+from sqlalchemy.engine import Engine
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 LOG = logging.getLogger(__name__)
@@ -21,6 +23,8 @@ class RunResult:
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=8), reraise=True)
 def extract(location: str, start: date, end: date) -> dict:
+    if location not in LOCATIONS or start > end:
+        raise ValueError("Unsupported location or reversed date range")
     lat, lon = LOCATIONS[location]
     response = requests.get(
         "https://archive-api.open-meteo.com/v1/archive",
@@ -43,11 +47,19 @@ def normalize(payload: dict, location: str) -> tuple[pd.DataFrame, pd.DataFrame]
     required = {"time", "temperature_2m_mean", "precipitation_sum", "wind_speed_10m_max"}
     if not required.issubset(daily):
         raise ValueError(f"Missing fields: {sorted(required - set(daily))}")
-    frame = pd.DataFrame(daily).rename(columns={"time": "observed_on"})
+    frame = pd.DataFrame({key: daily[key] for key in required}).rename(
+        columns={"time": "observed_on"}
+    )
     frame["location"] = location
-    frame["observed_on"] = pd.to_datetime(frame["observed_on"]).dt.date
+    frame["observed_on"] = pd.to_datetime(frame["observed_on"], errors="coerce").dt.date
+    numeric = ["temperature_2m_mean", "precipitation_sum", "wind_speed_10m_max"]
+    frame[numeric] = (
+        frame[numeric].apply(pd.to_numeric, errors="coerce").replace([np.inf, -np.inf], np.nan)
+    )
     invalid = frame[
         frame[["temperature_2m_mean", "precipitation_sum", "wind_speed_10m_max"]].isna().any(axis=1)
+        | frame["observed_on"].isna()
+        | (frame["wind_speed_10m_max"] < 0)
         | (frame["precipitation_sum"] < 0)
     ]
     clean = frame.drop(invalid.index).copy()
@@ -57,7 +69,7 @@ def normalize(payload: dict, location: str) -> tuple[pd.DataFrame, pd.DataFrame]
     return clean, invalid
 
 
-def load(frame: pd.DataFrame, engine) -> None:
+def load(frame: pd.DataFrame, engine: Engine) -> None:
     with engine.begin() as conn:
         for row in frame.to_dict("records"):
             row["observed_on"] = row["observed_on"].isoformat()
@@ -72,6 +84,8 @@ def load(frame: pd.DataFrame, engine) -> None:
 def run(
     database_url: str, location: str, start: date, end: date, payload: dict | None = None
 ) -> RunResult:
+    if location not in LOCATIONS or start > end:
+        raise ValueError("Unsupported location or reversed date range")
     engine = create_engine(database_url)
     identity = (
         "INTEGER PRIMARY KEY"
@@ -86,12 +100,18 @@ def run(
     run_id = hashlib.sha256(f"{location}:{start}:{end}".encode()).hexdigest()[:24]
     started = datetime.now(UTC)
     try:
-        clean, rejected = normalize(payload or extract(location, start, end), location)
+        raw = payload if payload is not None else extract(location, start, end)
+        clean, rejected = normalize(raw, location)
+        outside = (clean["observed_on"] < start) | (clean["observed_on"] > end)
+        rejected = pd.concat([rejected, clean[outside]], ignore_index=True)
+        clean = clean[~outside].copy()
+        if clean.empty:
+            raise ValueError("No valid observations in the requested date range")
         load(clean, engine)
         with engine.begin() as conn:
             conn.execute(
                 text(
-                    "INSERT INTO pipeline_runs(run_id,status,row_count,rejected_count,started_at,finished_at,error) VALUES(:id,'SUCCESS',:rows,:rejected,:started,:finished,NULL) ON CONFLICT(run_id) DO UPDATE SET status='SUCCESS',row_count=:rows,rejected_count=:rejected,finished_at=:finished,error=NULL"
+                    "INSERT INTO pipeline_runs(run_id,status,row_count,rejected_count,started_at,finished_at,error) VALUES(:id,'SUCCESS',:rows,:rejected,:started,:finished,NULL) ON CONFLICT(run_id) DO UPDATE SET status='SUCCESS',started_at=:started,row_count=:rows,rejected_count=:rejected,finished_at=:finished,error=NULL"
                 ),
                 {
                     "id": run_id,
@@ -101,13 +121,16 @@ def run(
                     "finished": datetime.now(UTC).isoformat(),
                 },
             )
+        LOG.info(
+            "pipeline_completed run_id=%s rows=%s rejected=%s", run_id, len(clean), len(rejected)
+        )
         return RunResult(run_id, len(clean), len(rejected))
     except Exception as exc:
         LOG.exception("pipeline_failed", extra={"run_id": run_id})
         with engine.begin() as conn:
             conn.execute(
                 text(
-                    "INSERT INTO pipeline_runs(run_id,status,row_count,rejected_count,started_at,finished_at,error) VALUES(:id,'FAILED',0,0,:started,:finished,:error) ON CONFLICT(run_id) DO UPDATE SET status='FAILED',finished_at=:finished,error=:error"
+                    "INSERT INTO pipeline_runs(run_id,status,row_count,rejected_count,started_at,finished_at,error) VALUES(:id,'FAILED',0,0,:started,:finished,:error) ON CONFLICT(run_id) DO UPDATE SET status='FAILED',row_count=0,rejected_count=0,started_at=:started,finished_at=:finished,error=:error"
                 ),
                 {
                     "id": run_id,
@@ -117,3 +140,5 @@ def run(
                 },
             )
         raise
+    finally:
+        engine.dispose()

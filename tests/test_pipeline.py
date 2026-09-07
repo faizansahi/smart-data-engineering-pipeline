@@ -1,5 +1,6 @@
 from datetime import date
 
+import pytest
 from sqlalchemy import create_engine, text
 
 from weather_pipeline.pipeline import normalize, run
@@ -31,7 +32,5 @@ def test_idempotent_complete_etl(tmp_path):
 
 
 def test_schema_failure():
-    try:
+    with pytest.raises(ValueError, match="Missing fields"):
         normalize({"daily": {"time": []}}, "Berlin")
-    except ValueError as exc:
-        assert "Missing fields" in str(exc)
