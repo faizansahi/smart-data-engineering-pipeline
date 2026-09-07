@@ -1,22 +1,22 @@
 services:
   db:
     image: postgres:16-alpine
-    environment: {POSTGRES_DB: weather,POSTGRES_USER: postgres,POSTGRES_PASSWORD: postgres}
-    healthcheck: {test: ["CMD-SHELL","pg_isready -U postgres"],interval: 5s,timeout: 3s,retries: 10}
+    environment:
+      POSTGRES_DB: weather
+      POSTGRES_USER: portfolio
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your local .env}
+    volumes: ["postgres_data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U portfolio -d weather"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
   pipeline:
     build: .
-    environment: ["DATABASE_URL=postgresql+psycopg://postgres:postgres@db:5432/weather","LOCATION=Berlin"]
-    depends_on: {db: {condition: service_healthy}}
-  airflow:
-    image: apache/airflow:2.10.5-python3.12
-    command: standalone
-    ports: ["8080:8080"]
     environment:
-      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
-      PYTHONPATH: /opt/airflow/project/src
-      DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/weather
-      LOCATION: Berlin
-    volumes:
-      - ./dags:/opt/airflow/dags
-      - ./:/opt/airflow/project
-    depends_on: {db: {condition: service_healthy}}
+      DATABASE_URL: postgresql+psycopg://portfolio:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your local .env}@db:5432/weather
+    depends_on:
+      db:
+        condition: service_healthy
+volumes:
+  postgres_data: {}

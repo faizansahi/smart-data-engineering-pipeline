@@ -1,0 +1,15 @@
+services:
+  airflow:
+    build:
+      context: .
+      dockerfile: Dockerfile.airflow
+    command: standalone
+    ports: ["127.0.0.1:8080:8080"]
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      DATABASE_URL: postgresql+psycopg://portfolio:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your local .env}@db:5432/weather
+      LOCATION: Berlin
+    volumes: ["./dags:/opt/airflow/dags:ro"]
+    depends_on:
+      db:
+        condition: service_healthy
