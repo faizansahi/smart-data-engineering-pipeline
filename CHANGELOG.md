@@ -1,3 +1,13 @@
 # Changelog
+
+## Unreleased
+
+- Add reproducible execution evidence, real visuals, and recruiter-facing documentation.
+- Fix validation, configuration, and persistence issues found during review.
+- Add regression and integration coverage and isolated test-store cleanup.
+- Replace embedded Compose passwords with required local environment values.
+- Add explicit container verification to CI.
+
 ## 0.1.0 - 2026-09-07
-- Initial Open-Meteo ETL, data quality, metadata, Airflow DAG, analytics views, Docker, and CI release.
+
+- Initial Smart Data Engineering Pipeline implementation, tests, Docker configuration, and CI.

@@ -1,0 +1,103 @@
+{
+  "source": "Open-Meteo historical API",
+  "database": "sqlite",
+  "date_range": [
+    "2025-01-01",
+    "2025-01-07"
+  ],
+  "first_run": {
+    "run_id": "d4305d60748a300d571f35c8",
+    "rows": 7,
+    "rejected": 0
+  },
+  "second_run": {
+    "run_id": "d4305d60748a300d571f35c8",
+    "rows": 7,
+    "rejected": 0
+  },
+  "idempotency_verified": true,
+  "analytics": [
+    {
+      "id": 1,
+      "location": "Berlin",
+      "observed_on": "2025-01-01",
+      "temperature_mean": 4.6,
+      "precipitation_sum": 0.0,
+      "wind_speed_max": 26.4,
+      "is_temperature_anomaly": 0
+    },
+    {
+      "id": 2,
+      "location": "Berlin",
+      "observed_on": "2025-01-02",
+      "temperature_mean": 4.3,
+      "precipitation_sum": 4.2,
+      "wind_speed_max": 26.1,
+      "is_temperature_anomaly": 0
+    },
+    {
+      "id": 3,
+      "location": "Berlin",
+      "observed_on": "2025-01-03",
+      "temperature_mean": 0.9,
+      "precipitation_sum": 3.1,
+      "wind_speed_max": 30.3,
+      "is_temperature_anomaly": 0
+    },
+    {
+      "id": 4,
+      "location": "Berlin",
+      "observed_on": "2025-01-04",
+      "temperature_mean": -1.1,
+      "precipitation_sum": 0.0,
+      "wind_speed_max": 19.8,
+      "is_temperature_anomaly": 0
+    },
+    {
+      "id": 5,
+      "location": "Berlin",
+      "observed_on": "2025-01-05",
+      "temperature_mean": -1.1,
+      "precipitation_sum": 8.4,
+      "wind_speed_max": 18.7,
+      "is_temperature_anomaly": 0
+    },
+    {
+      "id": 6,
+      "location": "Berlin",
+      "observed_on": "2025-01-06",
+      "temperature_mean": 7.1,
+      "precipitation_sum": 13.4,
+      "wind_speed_max": 25.8,
+      "is_temperature_anomaly": 0
+    },
+    {
+      "id": 7,
+      "location": "Berlin",
+      "observed_on": "2025-01-07",
+      "temperature_mean": 5.4,
+      "precipitation_sum": 1.9,
+      "wind_speed_max": 20.9,
+      "is_temperature_anomaly": 0
+    }
+  ],
+  "summary": [
+    {
+      "location": "Berlin",
+      "average_temperature": 2.871428571428571,
+      "average_max_wind": 24.0,
+      "total_precipitation": 31.0
+    }
+  ],
+  "runs": [
+    {
+      "run_id": "d4305d60748a300d571f35c8",
+      "status": "SUCCESS",
+      "row_count": 7,
+      "rejected_count": 0,
+      "started_at": "2026-09-07T00:42:06.971006+00:00",
+      "finished_at": "2026-09-07T00:42:06.973644+00:00",
+      "error": null
+    }
+  ]
+}

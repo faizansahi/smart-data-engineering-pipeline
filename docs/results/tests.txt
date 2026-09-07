@@ -1,0 +1,13 @@
+$ python -m pytest --cov=weather_pipeline --cov-report=term-missing -q
+...........                                                              [100%]
+=============================== tests coverage ================================
+_______________ coverage: platform win32, python 3.12.6-final-0 _______________
+
+Name                               Stmts   Miss  Cover   Missing
+----------------------------------------------------------------
+src\weather_pipeline\__init__.py       0      0   100%
+src\weather_pipeline\cli.py           22     22     0%   1-30
+src\weather_pipeline\pipeline.py      75      7    91%   26-42, 109
+----------------------------------------------------------------
+TOTAL                                 97     29    70%
+11 passed in 3.64s
