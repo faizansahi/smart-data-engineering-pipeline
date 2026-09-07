@@ -1,147 +1,103 @@
 # Smart Data Engineering Pipeline
 
-Extract European weather data, validate daily observations, and load repeatable SQL analytics with Python.
+A Python ETL pipeline that turns Open-Meteo daily weather responses into validated SQL tables and analytics views.
 
-![Chart from actual execution](docs/images/demo.png)
+![Temperature and precipitation chart from loaded Berlin weather data](docs/images/analytics-chart.png)
 
-![Python](https://img.shields.io/badge/Python-demonstrated-187c9a) ![Pandas](https://img.shields.io/badge/Pandas-demonstrated-187c9a) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-demonstrated-187c9a) ![Airflow](https://img.shields.io/badge/Airflow-demonstrated-187c9a)
 [![CI](https://github.com/faizansahi/smart-data-engineering-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/faizansahi/smart-data-engineering-pipeline/actions/workflows/ci.yml)
 
-## Overview
+## One week through the pipeline
 
-An ETL pipeline built around Open-Meteo historical weather data. The CLI runs independently; an optional Airflow deployment schedules it.
+The demo fetches Berlin weather for 1–7 January 2025, validates it, loads SQLite,
+queries the analytics views, and loads the same interval again to check idempotency.
+The saved run contains seven observations and no rejected rows. The chart uses
+the loaded rows, not a separately prepared dataset.
 
-## Business Problem
+[Raw API response](docs/results/source.json) · [SQL rows and run results](docs/results/demo.json)
 
-Logistics and operations analysis needs consistent weather context, but raw API responses contain missing values and must be safe to reload.
+Weather data: [Open-Meteo](https://open-meteo.com/), CC BY 4.0.
+The archive contains reanalysis data; these are not guaranteed station measurements.
 
-## Solution
+## Data flow
 
-Separate HTTP extraction, Pandas validation, SQL upserts, and run metadata. Publish SQL views for daily trends, location summaries, and anomaly rates.
-
-## Key Features
-
-- Fetch historical observations for Berlin, Hamburg, or Munich with bounded retries.
-- Reject missing, non-numeric, infinite, negative wind/precipitation, and invalid-date values.
-- Reject observations outside the requested interval.
-- Upsert by location/date and record success or failure metadata.
-- Provide an Airflow DAG and SQL analytics views.
-
-## Architecture
-
-```mermaid
+~~~mermaid
 flowchart LR
-  API[Open-Meteo archive API] --> Raw[Daily JSON]
-  Raw --> Validate[Pandas validation]
-  Validate --> Rejected[Rejected rows]
+  Source[Open-Meteo JSON] --> Validate[Pandas validation]
+  Validate --> Rejected[Rejected row count]
   Validate --> Load[SQL upsert]
-  Load --> DB[(SQLite or PostgreSQL)]
-  DB --> Views[Analytics views]
-  Views --> Chart[Weather chart]
-  Airflow[Optional Airflow DAG] --> API
-```
+  Load --> DB[(analytics_weather)]
+  DB --> Views[SQL views]
+  Views --> Chart[Temperature / precipitation]
+~~~
 
-[Architecture details](docs/architecture.md) · [Engineering decisions](docs/decisions.md)
+The input is raw JSON, validation uses an in-memory Pandas staging frame, and
+the durable layer is a relational table plus SQL views. There are no separately
+persisted raw or staging database layers. The demo archives its raw response;
+the CLI currently does not.
 
-## Technology Stack
+- Required arrays must align. Invalid dates, nonnumeric or infinite measurements,
+  negative wind/precipitation, and out-of-interval rows are rejected.
+- A location/date key makes reloading an interval update rows without duplicating them.
+- Extraction has a 30-second request timeout and at most three attempts.
+- Run metadata records status, counts, and timestamps. Reruns replace the previous
+  metadata for that interval rather than appending an attempt history.
+- The anomaly flag uses two standard deviations within the current batch, so changing
+  the batch boundaries can change the flag.
 
-Python 3.12, Pandas, Requests, Tenacity, SQLAlchemy, PostgreSQL/SQLite, Apache Airflow 2.10.5 (optional), Matplotlib, Docker Compose, Pytest, Ruff, and GitHub Actions.
+![Actual validation and rerun row counts](docs/images/data-quality-result.png)
 
-## Demo / Results
+## Run an interval
 
-The live Open-Meteo demo loaded **7 Berlin observations for 1–7 January 2025**, rejected 0 rows, and kept 7 rows after a second execution. The SQL summary returned 31.0 mm total precipitation. The chart is drawn from those loaded rows. The saved local execution used SQLite; PostgreSQL/container verification is recorded separately.
+Requires Python 3.12+. Create and activate a virtual environment, then:
 
-[Actual output](docs/results/demo.json) · [PostgreSQL container results](docs/results/docker-demo.json) · [Test report](docs/results/tests.txt) · [Provenance](docs/results/provenance.md) · [Verification status](docs/results/verification.md)
-
-Reproduce using a fresh local database:
-
-```bash
-python scripts/demo_pipeline.py
-```
-
-## Installation
-
-Requires Python 3.12+. From this repository:
-
-```bash
-python -m venv .venv
-# Linux/macOS: source .venv/bin/activate
-# Windows PowerShell: .venv\Scripts\Activate.ps1
+~~~bash
 python -m pip install -e ".[dev,demo]"
 python -m weather_pipeline.cli --location Berlin --start 2025-01-01 --end 2025-01-07
-```
+~~~
 
-The CLI defaults to SQLite. The demo also applies the SQL analytics views. See [setup](docs/setup.md).
+Berlin, Hamburg, and Munich are supported. The CLI reads `DATABASE_URL` from the
+environment or `.env`; it defaults to `sqlite:///./weather.db`.
 
-## Docker Setup
+~~~bash
+python scripts/demo_pipeline.py
+~~~
 
-Copy `.env.example` to `.env`, set a unique URL-safe `POSTGRES_PASSWORD`, then run:
+The demo requires network access and uses `weather-demo.db` unless `DATABASE_URL`
+is set. Use a fresh database to reproduce the saved row-count checks.
+It also applies `sql/analytics.sql`, which defines daily trends, per-location
+summaries, and anomaly rates. This is a CLI/data project; it has no HTTP API.
 
-```bash
+## PostgreSQL and scheduling
+
+Copy `.env.example` to `.env`, set a unique URL-safe `POSTGRES_PASSWORD`, then:
+
+~~~bash
 docker compose up --build --abort-on-container-exit --exit-code-from pipeline
-```
+~~~
 
-Compose supplies PostgreSQL and persistent storage. The pipeline runs once. Airflow is optional; see setup. Docker was unavailable on the local Windows review machine; [verification status](docs/results/verification.md) records separate container checks.
+The default stack executes one pipeline run. An optional Airflow 2.10.5 DAG is
+provided in `dags/`; [setup](docs/setup.md) covers its Compose override.
+Airflow uses an external Python environment because its SQLAlchemy requirements
+conflict with the pipeline's SQLAlchemy 2 dependency. Image build and DAG import
+are checked in CI; scheduled execution and the Airflow UI have not been verified.
 
-## Environment Variables
+## Checks
 
-| Variable | Default / requirement | Purpose |
-|---|---|---|
-| `DATABASE_URL` | `sqlite:///./weather.db` | SQLAlchemy connection URL |
-| `LOCATION` | `Berlin` | Berlin, Hamburg, or Munich |
-| `POSTGRES_PASSWORD` | Required for Compose | Local database password |
-
-The app reads `.env`. Compose overrides the database URL with its internal PostgreSQL address. Keep real values out of Git.
-
-## API Usage
-
-This project exposes a CLI and SQL tables rather than an HTTP service.
-
-```bash
-python -m weather_pipeline.cli --location Hamburg --start 2025-01-01 --end 2025-01-07
-```
-
-[API / data contracts](docs/api.md).
-
-## Tests
-
-```bash
-ruff format --check .
+~~~bash
 ruff check .
+ruff format --check .
 pytest --cov=weather_pipeline --cov-report=term-missing
 python -m pip check
-```
+~~~
 
-The recorded Windows run passed **11 tests** with **70% statement coverage**. Coverage describes this suite, not complete correctness.  GitHub Actions runs quality and container checks; its badge reports the current status.
+Tests cover validation failures, interval filtering, idempotent loading, and run metadata.
+CI builds the pipeline image, loads a labeled fixture into PostgreSQL twice, and queries
+the SQL views. [Verification notes](docs/results/verification.md) distinguish that fixture
+from the live Open-Meteo demo.
 
-## Project Structure
+The implementation uses Pandas, Requests, Tenacity, SQLAlchemy, PostgreSQL/SQLite,
+and Matplotlib. The main remaining data engineering work is persistent raw storage,
+per-attempt lineage, and an anomaly baseline independent of extraction windows.
 
-```text
-src/weather_pipeline/     Application and domain logic
-tests/                  Unit and integration tests
-scripts/                Reproducible demos and clients
-docs/                   Architecture, setup, API, decisions
-docs/images/            Real screenshots and output visuals
-docs/results/           Execution and test evidence
-.github/workflows/      Automated checks
-```
-
-## Engineering Decisions
-
-Natural-key upserts make reruns idempotent. A deterministic run ID identifies a location/date interval; its metadata describes the latest attempt. SQLite supports quick local tests, while Compose uses PostgreSQL. Anomaly flags use the current validated batch's mean and standard deviation.
-
-## Limitations
-
-The local evidence uses SQLite. Open-Meteo data is reanalysis, not a station measurement guarantee. Run metadata is overwritten on rerun rather than retained as an attempt history. Anomaly flags depend on batch boundaries. The CLI does not archive raw data automatically; the demo does. Airflow is optional and its standalone UI is a development setup.
-
-## Future Improvements
-
-Add per-attempt lineage, persistent raw storage, incremental watermarks, batch-independent anomaly baselines, and broader data-contract tests.
-
-## Skills Demonstrated
-
-Python, Data Engineering, ETL, Data Validation, Pandas, SQL, PostgreSQL, retry handling, idempotency, Airflow scheduling, Docker, Git, Pytest, and CI/CD checks.
-
-## Relevance for German Werkstudent Roles
-
-Relevant to Werkstudent Data Engineering roles: it connects a public API to validated relational data, SQL reporting, scheduling, and repeatable execution.
+[Data contracts](docs/api.md) · [Design decisions](docs/decisions.md) ·
+[Test output](docs/results/tests.txt) · [Data provenance](docs/results/provenance.md)

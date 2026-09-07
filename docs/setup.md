@@ -18,11 +18,11 @@ Use a fresh database:
 python scripts/demo_pipeline.py
 ```
 
-The script saves actual JSON in `docs/results/` and output visuals in `docs/images/`. Rerunning replaces the saved demo artifacts. Swagger screenshots were captured from running Uvicorn servers with a headless browser.
+The script saves actual JSON in `docs/results/` and output visuals in `docs/images/`. Rerunning replaces the saved demo artifacts.
 
 ## PostgreSQL and Docker
 
-Set a unique URL-safe `POSTGRES_PASSWORD` in your ignored `.env`. Compose requires it and supplies the internal connection URL. Start with `docker compose up --build`. Persistent volumes survive ordinary `docker compose down`.
+Set a unique URL-safe `POSTGRES_PASSWORD` in your ignored `.env`. Compose requires it and supplies the internal connection URL. Run `docker compose up --build --abort-on-container-exit --exit-code-from pipeline`. Persistent volumes survive ordinary `docker compose down`.
 
 Optional scheduler: `docker compose -f docker-compose.yml -f docker-compose.airflow.yml up --build airflow`. Airflow standalone creates local UI credentials in its startup output. This is a development scheduler. Its image installs the pipeline package; the DAG calls the pipeline directly.
 
