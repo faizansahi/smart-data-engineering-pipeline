@@ -77,7 +77,20 @@ def main():
         fontsize=8,
     )
     fig.tight_layout(rect=(0, 0.04, 1, 1))
-    fig.savefig(images / "demo.png", dpi=150)
+    fig.savefig(images / "analytics-chart.png", dpi=150)
+    plt.close(fig)
+    fig, ax = plt.subplots(figsize=(8, 4))
+    counts = [first.rows, first.rejected, len(rows)]
+    ax.bar(
+        ["Loaded", "Rejected", "Rows after rerun"], counts, color=["#187c9a", "#bd5839", "#469d76"]
+    )
+    ax.set(title="Berlin ETL | validation and idempotency", ylabel="Rows")
+    ax.set_yticks(range(max(counts) + 1))
+    for index, count in enumerate(counts):
+        ax.text(index, count + 0.1, str(count), ha="center")
+    fig.tight_layout()
+    fig.savefig(images / "data-quality-result.png", dpi=150)
+    plt.close(fig)
     print(json.dumps(result, indent=2, default=str))
     engine.dispose()
 
